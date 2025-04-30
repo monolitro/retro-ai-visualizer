@@ -1,6 +1,6 @@
 // src/main.ts
 import { createIcons, icons } from 'lucide';
-import './styles/retro.css';
+import './styles/retro.css'; 
 import { createVisualizer, PRESETS, PRESET_NAMES } from './visualizer';
 
 // 1) Iconos Lucide
