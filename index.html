@@ -1,13 +1,38 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Visualizer by Manolitro</title>
+  <link rel="stylesheet" href="/src/styles/retro.css" />
+</head>
+<body>
+  <header>
+    <h1>Visualizer by Manolitro</h1>
+  </header>
+
+  <main>
+    <div class="sc-loader">
+      <input type="text" id="scUrlInput" placeholder="SoundCloud playlist URL" />
+      <button id="loadScBtn">Load SC Playlist</button>
+    </div>
+
+    <div class="controls">
+      <button id="queueBtn"     title="Show Queue"><i data-lucide="list-music"></i></button>
+      <button id="prevBtn"      title="Previous"   ><i data-lucide="skip-back"></i></button>
+      <button id="playPauseBtn" title="Play/Pause" ><i data-lucide="play"></i></button>
+      <button id="nextBtn"      title="Next"       ><i data-lucide="skip-forward"></i></button>
+      <button id="loadBtn">Load Files</button>
+    </div>
+
+    <ul id="queue" class="hidden"></ul>
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <button id="fullscreenBtn" title="Fullscreen">
+    <i data-lucide="maximize-2"></i>
+  </button>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
 </html>

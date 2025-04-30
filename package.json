@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "butterchurn": "^2.6.7",
-    "butterchurn-presets": "^2.4.7"
+    "butterchurn-presets": "^2.4.7",
+    "lucide": "^0.503.0"
   }
 }
