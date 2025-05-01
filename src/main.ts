@@ -1,19 +1,30 @@
+// src/main.ts
 import { createIcons, icons } from 'lucide';
-import { createVisualizer } from './visualizer';
+import { createVisualizer }   from './visualizer';
 import './styles/retro.css';
 
+// ——————————————
+// 1) Inicializar iconos Lucide
+// ——————————————
 createIcons({ icons });
 
-const scUrlInput   = document.getElementById('scUrlInput') as HTMLInputElement;
-const loadScBtn    = document.getElementById('loadScBtn')    as HTMLButtonElement;
-const loadBtn      = document.getElementById('loadBtn')      as HTMLButtonElement;
-const queueBtn     = document.getElementById('queueBtn')     as HTMLButtonElement;
-const playPauseBtn = document.getElementById('playPauseBtn') as HTMLButtonElement;
-const prevBtn      = document.getElementById('prevBtn')      as HTMLButtonElement;
-const nextBtn      = document.getElementById('nextBtn')      as HTMLButtonElement;
-const queueEl      = document.getElementById('queue')        as HTMLUListElement;
-const canvas       = document.getElementById('canvas')       as HTMLCanvasElement;
+// ——————————————
+// 2) Referencias al DOM
+// ——————————————
+const scUrlInput    = document.getElementById('scUrlInput')   as HTMLInputElement;
+const loadScBtn     = document.getElementById('loadScBtn')    as HTMLButtonElement;
+const loadBtn       = document.getElementById('loadBtn')      as HTMLButtonElement;
+const queueBtn      = document.getElementById('queueBtn')     as HTMLButtonElement;
+const playPauseBtn  = document.getElementById('playPauseBtn') as HTMLButtonElement;
+const prevBtn       = document.getElementById('prevBtn')      as HTMLButtonElement;
+const nextBtn       = document.getElementById('nextBtn')      as HTMLButtonElement;
+const queueEl       = document.getElementById('queue')        as HTMLUListElement;
+const canvas        = document.getElementById('canvas')       as HTMLCanvasElement;
+const fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
 
+// ——————————————
+// 3) AudioContext + Analyser
+// ——————————————
 const audioCtx = new AudioContext();
 const analyser = audioCtx.createAnalyser();
 analyser.fftSize = 2048;
@@ -21,12 +32,19 @@ analyser.minDecibels = -90;
 analyser.maxDecibels = -10;
 analyser.smoothingTimeConstant = 0.85;
 
-let vizCtl: { start(): void; stop(): void } | null = null;
+// ——————————————
+// 4) Estado global
+// ——————————————
+let vizCtl: { start: ()=>void; stop: ()=>void; } | null = null;
 let audio = new Audio();
+audio.crossOrigin = 'anonymous';
 let queue: string[] = [];
 let current = 0;
 let playing = false;
 
+// ——————————————
+// 5) Íconos Play/Pause
+// ——————————————
 const playIcon  = '<i data-lucide="play"></i>';
 const pauseIcon = '<i data-lucide="pause"></i>';
 function updatePlayIcon() {
@@ -34,6 +52,9 @@ function updatePlayIcon() {
   createIcons({ icons });
 }
 
+// ——————————————
+// 6) Pintar cola
+// ——————————————
 function renderQueue() {
   queueEl.innerHTML = '';
   queue.forEach((_, i) => {
@@ -44,82 +65,131 @@ function renderQueue() {
   });
 }
 
+// ——————————————
+// 7) Cargar y reproducir pista
+// ——————————————
 async function loadTrack(idx: number) {
   if (!queue[idx]) return;
+  // si ya hay audio, lo detenemos
   audio.pause();
+  vizCtl?.stop();
 
+  // nuevo audio
   audio = new Audio(queue[idx]);
   audio.crossOrigin = 'anonymous';
 
+  // conectar al Analyser antes de play()
   const srcNode = audioCtx.createMediaElementSource(audio);
   srcNode.connect(analyser);
   analyser.connect(audioCtx.destination);
 
+  // crear visualizador la primera vez
   if (!vizCtl) {
     vizCtl = createVisualizer(audioCtx, analyser, canvas);
   }
 
+  // reanudar AudioContext si está en pausa
   if (audioCtx.state === 'suspended') {
     await audioCtx.resume();
   }
 
-  await new Promise<void>(res =>
-    audio.addEventListener('canplay', () => res(), { once: true })
-  );
+  // esperar a que esté listo para play()
+  await new Promise<void>(res => {
+    audio.addEventListener('canplay', () => res(), { once: true });
+  });
 
-  await audio.play();
-  playing = true;
-  vizCtl.start();
-  updatePlayIcon();
-  renderQueue();
+  try {
+    await audio.play();
+    playing = true;
+    vizCtl.start();
+    updatePlayIcon();
+    renderQueue();
+  } catch (err) {
+    console.error('audio.play() rechazado:', err);
+  }
 }
 
+// ——————————————
+// 8) Eventos UI
+// ——————————————
+
+// A) Local files
 loadBtn.addEventListener('click', () => {
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'audio/*';
   inp.multiple = true;
-  inp.onchange = () => {
-    queue = Array.from(inp.files||[]).map(f => URL.createObjectURL(f));
+  inp.onchange = async () => {
+    const files = Array.from(inp.files || []);
+    queue = files.map(f => URL.createObjectURL(f));
     current = 0;
     renderQueue();
-    loadTrack(0);
+    await loadTrack(current);
   };
   inp.click();
 });
 
+// B) SoundCloud via proxy
+loadScBtn.addEventListener('click', async () => {
+  const link = scUrlInput.value.trim();
+  if (!link) {
+    alert('Introduce una URL de SoundCloud');
+    return;
+  }
+  if (!link.includes('soundcloud.com')) {
+    alert('La URL debe ser de SoundCloud');
+    return;
+  }
+  // limpiar parámetros
+  let clean = link;
+  try {
+    const u = new URL(link);
+    clean = `${u.origin}${u.pathname}`;
+  } catch {}
+
+  const proxy = `/api/sc-stream?url=${encodeURIComponent(clean)}`;
+  queue.push(proxy);
+  current = queue.length - 1;
+  renderQueue();
+  await loadTrack(current);
+});
+
+// C) Mostrar/ocultar cola
 queueBtn.addEventListener('click', () => {
   queueEl.classList.toggle('hidden');
 });
 
+// D) Play/Pause
 playPauseBtn.addEventListener('click', () => {
   if (!audio.src) return;
   if (playing) {
     audio.pause();
     vizCtl?.stop();
+    playing = false;
   } else {
     audio.play();
     vizCtl?.start();
+    playing = true;
   }
-  playing = !playing;
   updatePlayIcon();
 });
 
-prevBtn.addEventListener('click', () => {
+// E) Prev/Next
+prevBtn.addEventListener('click', async () => {
   if (current > 0) {
     current--;
-    loadTrack(current);
+    await loadTrack(current);
   }
 });
-nextBtn.addEventListener('click', () => {
+nextBtn.addEventListener('click', async () => {
   if (current < queue.length - 1) {
     current++;
-    loadTrack(current);
+    await loadTrack(current);
   }
 });
 
+// F) Auto-advance
 audio.addEventListener('ended', () => {
-  vizCtl?.stop();
   setTimeout(() => {
     if (current < queue.length - 1) {
       current++;
@@ -128,28 +198,23 @@ audio.addEventListener('ended', () => {
       playing = false;
       updatePlayIcon();
     }
-  }, 1000);
+  }, 1000); // 1s de pausa entre pistas
 });
 
-// ** NUEVO ** Load SoundCloud por URL
-loadScBtn.addEventListener('click', async () => {
-  let link = scUrlInput.value.trim();
-  if (!link) {
-    return alert('Introduce una URL de SoundCloud');
+// G) Fullscreen para TODO (botón de la esquina)
+fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
   }
-  if (!link.includes('soundcloud.com')) {
-    return alert('La URL debe ser de SoundCloud');
-  }
-  // elimina parámetros
-  try {
-    const u = new URL(link);
-    link = `${u.origin}${u.pathname}`;
-  } catch {}
+});
 
-  // apuntamos al proxy
-  const proxyUrl = `/api/sc-stream?url=${encodeURIComponent(link)}`;
-  queue.push(proxyUrl);
-  current = queue.length - 1;
-  renderQueue();
-  await loadTrack(current);
+// H) Fullscreen SOLO para el canvas (click directo sobre él)
+canvas.addEventListener('click', () => {
+  if (document.fullscreenElement === canvas) {
+    document.exitFullscreen();
+  } else {
+    canvas.requestFullscreen();
+  }
 });

@@ -1,4 +1,3 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +7,10 @@
   <link rel="stylesheet" href="/src/styles/retro.css" />
 </head>
 <body>
-  <header><h1>Retro-AI Visualizer</h1></header>
+  <header>
+    <h1>Retro-AI Visualizer</h1>
+  </header>
+
   <main>
     <div class="sc-loader">
       <input
@@ -18,6 +20,7 @@
       />
       <button id="loadScBtn">Load SC</button>
     </div>
+
     <div class="controls">
       <button id="queueBtn"      title="Show Queue">
         <i data-lucide="list-music"></i>
@@ -33,9 +36,17 @@
       </button>
       <button id="loadBtn">Load Files</button>
     </div>
+
     <ul id="queue" class="hidden"></ul>
+
     <canvas id="canvas"></canvas>
   </main>
+
+  <!-- este botón estaba faltando -->
+  <button id="fullscreenBtn" title="Toggle Fullscreen" class="fullscreen-btn">
+    <i data-lucide="maximize-2"></i>
+  </button>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
