@@ -173,12 +173,14 @@ nextBtn.addEventListener('click', () => {
 
 // 13) Auto-advance
 audio.addEventListener('ended', () => {
+  playing = false;
+  updatePlayIcon();  // mostramos el icono de “play” 
   if (current < queue.length - 1) {
-    loadTrack(++current);
-  } else {
-    playing = false;
-    vizCtl?.stop();
-    updatePlayIcon();
+    // tras 1s, avanzamos a la siguiente
+    setTimeout(() => {
+      current++;
+      loadTrack(current);
+    }, 1000);
   }
 });
 
