@@ -3,25 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Visualizer by Manolitro</title>
+  <title>Retro-AI Visualizer</title>
   <link rel="stylesheet" href="/src/styles/retro.css" />
 </head>
 <body>
   <header>
-    <h1>Visualizer by Manolitro</h1>
+    <h1>Retro-AI Visualizer</h1>
   </header>
 
   <main>
-    <div class="sc-loader">
-      <input type="text" id="scUrlInput" placeholder="SoundCloud playlist URL" />
-      <button id="loadScBtn">Load SC Playlist</button>
+    <!-- Loader SoundCloud único -->
+    <div class="sc-loader" style="width:90%; max-width:960px; margin:16px auto; display:flex;">
+      <input
+        type="text"
+        id="scUrlInput"
+        placeholder="SoundCloud track or playlist URL"
+        style="flex:1; padding:4px 8px; background:#111; color:#00ff99; border:2px outset #00ff99; font-family:'Press Start 2P'; font-size:10px;"
+      />
+      <button
+        id="loadScBtn"
+        style="width:120px; margin-left:8px; background:#fff; border:2px solid #00ff99; font-family:'Press Start 2P'; font-size:10px; cursor:pointer;"
+      >
+        Load SC
+      </button>
     </div>
 
+    <!-- Controles retro -->
     <div class="controls">
-      <button id="queueBtn"     title="Show Queue"><i data-lucide="list-music"></i></button>
-      <button id="prevBtn"      title="Previous"   ><i data-lucide="skip-back"></i></button>
-      <button id="playPauseBtn" title="Play/Pause" ><i data-lucide="play"></i></button>
-      <button id="nextBtn"      title="Next"       ><i data-lucide="skip-forward"></i></button>
+      <button id="queueBtn"      title="Show Queue"><i data-lucide="list-music"></i></button>
+      <button id="prevBtn"       title="Previous"  ><i data-lucide="skip-back"></i></button>
+      <button id="playPauseBtn"  title="Play/Pause"><i data-lucide="play"></i></button>
+      <button id="nextBtn"       title="Next"      ><i data-lucide="skip-forward"></i></button>
       <button id="loadBtn">Load Files</button>
     </div>
 
@@ -29,6 +41,7 @@
     <canvas id="canvas"></canvas>
   </main>
 
+  <!-- Fullscreen esquina -->
   <button id="fullscreenBtn" title="Fullscreen">
     <i data-lucide="maximize-2"></i>
   </button>
