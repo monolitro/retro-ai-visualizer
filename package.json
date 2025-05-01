@@ -9,7 +9,10 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/node-fetch": "^2.6.12",
     "@types/webaudioapi": "^0.0.27",
+    "@vercel/node": "^5.1.15",
     "typescript": "~5.7.2",
     "vite": "^6.3.1"
   },
@@ -17,6 +20,6 @@
     "butterchurn": "^2.6.7",
     "butterchurn-presets": "^2.4.7",
     "lucide": "^0.503.0",
-    "soundcloud-downloader": "^1.0.0"
+    "node-fetch": "^3.3.2"
   }
 }
