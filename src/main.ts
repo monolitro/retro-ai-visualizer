@@ -22,28 +22,37 @@ const queueEl       = document.getElementById('queue')        as HTMLUListElemen
 const canvas        = document.getElementById('canvas')       as HTMLCanvasElement;
 const fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
 
+// Este es el único elemento <audio> que vamos a usar
+const audio = document.getElementById('audio') as HTMLAudioElement;
+audio.crossOrigin = 'anonymous';
+
 // ——————————————
 // 3) AudioContext + Analyser
 // ——————————————
-const audioCtx = new AudioContext();
-const analyser = audioCtx.createAnalyser();
-analyser.fftSize = 2048;
-analyser.minDecibels = -90;
-analyser.maxDecibels = -10;
+const audioCtx   = new AudioContext();
+const analyser   = audioCtx.createAnalyser();
+analyser.fftSize               = 2048;
+analyser.minDecibels           = -90;
+analyser.maxDecibels           = -10;
 analyser.smoothingTimeConstant = 0.85;
 
 // ——————————————
-// 4) Estado global
+// 4) Conectar el <audio> al AudioContext UNA SÓLA VEZ
+// ——————————————
+const srcNode = audioCtx.createMediaElementSource(audio);
+srcNode.connect(analyser);
+analyser.connect(audioCtx.destination);
+
+// ——————————————
+// 5) Estado global
 // ——————————————
 let vizCtl: { start: ()=>void; stop: ()=>void; } | null = null;
-let audio = new Audio();                   // inicial dummy
-audio.crossOrigin = 'anonymous';
 let queue: string[] = [];
 let current = 0;
 let playing = false;
 
 // ——————————————
-// 5) Íconos Play/Pause
+// 6) Íconos Play/Pause
 // ——————————————
 const playIcon  = '<i data-lucide="play"></i>';
 const pauseIcon = '<i data-lucide="pause"></i>';
@@ -53,7 +62,7 @@ function updatePlayIcon() {
 }
 
 // ——————————————
-// 6) Pintar cola
+// 7) Pintar cola
 // ——————————————
 function renderQueue() {
   queueEl.innerHTML = '';
@@ -66,50 +75,42 @@ function renderQueue() {
 }
 
 // ——————————————
-// 7) Cargar y reproducir pista (con auto-avance)
+// 8) Cargar y reproducir pista (con auto-avance)
 // ——————————————
 async function loadTrack(idx: number) {
   if (!queue[idx]) return;
 
-  // si ya hay audio, lo detenemos y limpiamos visual
+  // 1) Detén audio y visual
   audio.pause();
   vizCtl?.stop();
-  vizCtl = null;
+  // (no suspendemos audioCtx aquí)
 
-  // crear nuevo Audio y enganchar listener 'ended'
-  audio = new Audio(queue[idx]);
-  audio.crossOrigin = 'anonymous';
-  audio.addEventListener('ended', async () => {
-    // actualizar estado e icono
+  // 2) Cambia la fuente
+  audio.src = queue[idx];
+  audio.load();
+
+  // 3) Auto-avance al terminar
+  audio.onended = async () => {
     playing = false;
     updatePlayIcon();
-
-    // si hay más pistas...
     if (current < queue.length - 1) {
-      // espera 1 segundo
-      await new Promise(res => setTimeout(res, 1000));
-      // avanza índice y recarga
+      await new Promise(r => setTimeout(r, 1000));
       current++;
       await loadTrack(current);
     }
-  });
+  };
 
-  // conectar al Analyser antes de play()
-  const srcNode = audioCtx.createMediaElementSource(audio);
-  srcNode.connect(analyser);
-  analyser.connect(audioCtx.destination);
-
-  // crear visualizador la primera vez
+  // 4) Inicializa el visualizador si hace falta
   if (!vizCtl) {
     vizCtl = createVisualizer(audioCtx, analyser, canvas);
   }
 
-  // reanudar AudioContext si está en pausa
+  // 5) Asegurar AudioContext activo
   if (audioCtx.state === 'suspended') {
     await audioCtx.resume();
   }
 
-  // esperar a que esté listo
+  // 6) Esperar a que esté listo y lanzar play()
   await new Promise<void>(res => {
     audio.addEventListener('canplay', () => res(), { once: true });
   });
@@ -126,7 +127,7 @@ async function loadTrack(idx: number) {
 }
 
 // ——————————————
-// 8) Eventos UI
+// 9) Eventos UI
 // ——————————————
 
 // A) Archivos locales
@@ -145,7 +146,7 @@ loadBtn.addEventListener('click', () => {
   inp.click();
 });
 
-// B) SoundCloud via proxy
+// B) SoundCloud vía proxy
 loadScBtn.addEventListener('click', async () => {
   const link = scUrlInput.value.trim();
   if (!link) {
@@ -157,10 +158,7 @@ loadScBtn.addEventListener('click', async () => {
     return;
   }
   let clean = link;
-  try {
-    const u = new URL(link);
-    clean = `${u.origin}${u.pathname}`;
-  } catch {}
+  try { clean = `${new URL(link).origin}${new URL(link).pathname}`; } catch {}
   const proxy = `/api/sc-stream?url=${encodeURIComponent(clean)}`;
   queue.push(proxy);
   current = queue.length - 1;
@@ -202,7 +200,7 @@ nextBtn.addEventListener('click', async () => {
   }
 });
 
-// G) Fullscreen para TODO
+// F) Fullscreen para TODO
 fullscreenBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
@@ -211,7 +209,7 @@ fullscreenBtn.addEventListener('click', () => {
   }
 });
 
-// H) Fullscreen SOLO canvas
+// G) Fullscreen SOLO canvas
 canvas.addEventListener('click', () => {
   if (document.fullscreenElement === canvas) {
     document.exitFullscreen();
