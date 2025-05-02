@@ -1,4 +1,6 @@
 // src/global.d.ts
+declare module 'butterchurn';
+declare module 'butterchurn-presets';
 declare module 'soundcloud-downloader' {
     import { Readable } from 'stream';
     export function download(

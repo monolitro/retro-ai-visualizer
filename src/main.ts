@@ -36,7 +36,7 @@ analyser.smoothingTimeConstant = 0.85;
 // 4) Estado global
 // ——————————————
 let vizCtl: { start: ()=>void; stop: ()=>void; } | null = null;
-let audio = new Audio();
+let audio = new Audio();                   // inicial dummy
 audio.crossOrigin = 'anonymous';
 let queue: string[] = [];
 let current = 0;
@@ -66,17 +66,33 @@ function renderQueue() {
 }
 
 // ——————————————
-// 7) Cargar y reproducir pista
+// 7) Cargar y reproducir pista (con auto-avance)
 // ——————————————
 async function loadTrack(idx: number) {
   if (!queue[idx]) return;
-  // si ya hay audio, lo detenemos
+
+  // si ya hay audio, lo detenemos y limpiamos visual
   audio.pause();
   vizCtl?.stop();
+  vizCtl = null;
 
-  // nuevo audio
+  // crear nuevo Audio y enganchar listener 'ended'
   audio = new Audio(queue[idx]);
   audio.crossOrigin = 'anonymous';
+  audio.addEventListener('ended', async () => {
+    // actualizar estado e icono
+    playing = false;
+    updatePlayIcon();
+
+    // si hay más pistas...
+    if (current < queue.length - 1) {
+      // espera 1 segundo
+      await new Promise(res => setTimeout(res, 1000));
+      // avanza índice y recarga
+      current++;
+      await loadTrack(current);
+    }
+  });
 
   // conectar al Analyser antes de play()
   const srcNode = audioCtx.createMediaElementSource(audio);
@@ -93,7 +109,7 @@ async function loadTrack(idx: number) {
     await audioCtx.resume();
   }
 
-  // esperar a que esté listo para play()
+  // esperar a que esté listo
   await new Promise<void>(res => {
     audio.addEventListener('canplay', () => res(), { once: true });
   });
@@ -113,7 +129,7 @@ async function loadTrack(idx: number) {
 // 8) Eventos UI
 // ——————————————
 
-// A) Local files
+// A) Archivos locales
 loadBtn.addEventListener('click', () => {
   const inp = document.createElement('input');
   inp.type = 'file';
@@ -140,13 +156,11 @@ loadScBtn.addEventListener('click', async () => {
     alert('La URL debe ser de SoundCloud');
     return;
   }
-  // limpiar parámetros
   let clean = link;
   try {
     const u = new URL(link);
     clean = `${u.origin}${u.pathname}`;
   } catch {}
-
   const proxy = `/api/sc-stream?url=${encodeURIComponent(clean)}`;
   queue.push(proxy);
   current = queue.length - 1;
@@ -188,24 +202,7 @@ nextBtn.addEventListener('click', async () => {
   }
 });
 
-// F) Auto-advance
-audio.addEventListener('ended', async () => {
-  // Cambio icono a "pausado"
-  playing = false;
-  updatePlayIcon();
-
-  // Si queda otra pista en la cola:
-  if (current < queue.length - 1) {
-    // Espera 1 segundo
-    await new Promise((res) => setTimeout(res, 1000));
-
-    // Avanza y carga la siguiente
-    current++;
-    await loadTrack(current);
-  }
-});
-
-// G) Fullscreen para TODO (botón de la esquina)
+// G) Fullscreen para TODO
 fullscreenBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
@@ -214,7 +211,7 @@ fullscreenBtn.addEventListener('click', () => {
   }
 });
 
-// H) Fullscreen SOLO para el canvas (click directo sobre él)
+// H) Fullscreen SOLO canvas
 canvas.addEventListener('click', () => {
   if (document.fullscreenElement === canvas) {
     document.exitFullscreen();
