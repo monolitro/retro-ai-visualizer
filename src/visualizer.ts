@@ -30,8 +30,17 @@ export function createVisualizer(
     viz.render();
     raf = requestAnimationFrame(loop);
   }
+
   return {
-    start() { if (!raf) loop(); },
-    stop()  { cancelAnimationFrame(raf); raf = 0; }
+    start() {
+      if (!raf) loop();
+    },
+    stop() {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      // limpiamos el canvas para que no queden restos
+      const ctx2 = canvas.getContext('2d');
+      if (ctx2) ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    }
   };
 }

@@ -1,4 +1,3 @@
-// src/main.ts
 import { createIcons, icons } from 'lucide';
 import { createVisualizer }   from './visualizer';
 import './styles/retro.css';
@@ -22,22 +21,22 @@ const queueEl       = document.getElementById('queue')        as HTMLUListElemen
 const canvas        = document.getElementById('canvas')       as HTMLCanvasElement;
 const fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
 
-// Este es el único elemento <audio> que vamos a usar
+// Único <audio> en el DOM
 const audio = document.getElementById('audio') as HTMLAudioElement;
 audio.crossOrigin = 'anonymous';
 
 // ——————————————
 // 3) AudioContext + Analyser
 // ——————————————
-const audioCtx   = new AudioContext();
-const analyser   = audioCtx.createAnalyser();
+const audioCtx = new AudioContext();
+const analyser = audioCtx.createAnalyser();
 analyser.fftSize               = 2048;
 analyser.minDecibels           = -90;
 analyser.maxDecibels           = -10;
 analyser.smoothingTimeConstant = 0.85;
 
 // ——————————————
-// 4) Conectar el <audio> al AudioContext UNA SÓLA VEZ
+// 4) Conectar el <audio> al AudioContext UNA VEZ
 // ——————————————
 const srcNode = audioCtx.createMediaElementSource(audio);
 srcNode.connect(analyser);
@@ -80,10 +79,10 @@ function renderQueue() {
 async function loadTrack(idx: number) {
   if (!queue[idx]) return;
 
-  // 1) Detén audio y visual
+  // 1) Detén audio y visual, forzamos reinicio
   audio.pause();
   vizCtl?.stop();
-  // (no suspendemos audioCtx aquí)
+  vizCtl = null;
 
   // 2) Cambia la fuente
   audio.src = queue[idx];
@@ -100,10 +99,8 @@ async function loadTrack(idx: number) {
     }
   };
 
-  // 4) Inicializa el visualizador si hace falta
-  if (!vizCtl) {
-    vizCtl = createVisualizer(audioCtx, analyser, canvas);
-  }
+  // 4) Creamos siempre un nuevo visualizador
+  vizCtl = createVisualizer(audioCtx, analyser, canvas);
 
   // 5) Asegurar AudioContext activo
   if (audioCtx.state === 'suspended') {
