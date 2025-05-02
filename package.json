@@ -1,25 +1,24 @@
 {
-  "name": "visualizer",
+  "name": "ai-visualizer",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "@types/node": "^22.15.3",
-    "@types/node-fetch": "^2.6.12",
-    "@types/webaudioapi": "^0.0.27",
-    "@vercel/node": "^5.1.15",
-    "typescript": "~5.7.2",
-    "vite": "^6.3.1"
+    "preview": "vite preview",
+    "vercel-dev": "vercel dev --listen 3000"
   },
   "dependencies": {
-    "butterchurn": "^2.6.7",
-    "butterchurn-presets": "^2.4.7",
-    "lucide": "^0.503.0",
-    "node-fetch": "^3.3.2"
+    "butterchurn": "^1.6.1",
+    "butterchurn-presets": "^1.1.1",
+    "lucide": "^0.118.0",
+    "soundcloud-downloader": "^1.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/butterchurn": "^1.0.0",
+    "@types/butterchurn-presets": "^1.0.0",
+    "typescript": "^4.8.4",
+    "vite": "^6.3.4"
   }
 }

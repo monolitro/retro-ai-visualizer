@@ -189,16 +189,20 @@ nextBtn.addEventListener('click', async () => {
 });
 
 // F) Auto-advance
-audio.addEventListener('ended', () => {
-  setTimeout(() => {
-    if (current < queue.length - 1) {
-      current++;
-      loadTrack(current);
-    } else {
-      playing = false;
-      updatePlayIcon();
-    }
-  }, 1000); // 1s de pausa entre pistas
+audio.addEventListener('ended', async () => {
+  // Cambio icono a "pausado"
+  playing = false;
+  updatePlayIcon();
+
+  // Si queda otra pista en la cola:
+  if (current < queue.length - 1) {
+    // Espera 1 segundo
+    await new Promise((res) => setTimeout(res, 1000));
+
+    // Avanza y carga la siguiente
+    current++;
+    await loadTrack(current);
+  }
 });
 
 // G) Fullscreen para TODO (botón de la esquina)
