@@ -14,7 +14,7 @@
 body {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   background: #000 url('/bg-stars.gif') no-repeat center center;
   background-size: cover;
   color: #00ff99;
@@ -23,73 +23,113 @@ body {
 
 /* 4. Header */
 header {
-  padding: 8px;
+  padding: 12px;
   text-align: center;
   background: #111;
   border-bottom: 3px ridge #00ff99;
 }
 
-/* 5. Main */
+/* 5. Main: centrar todo y añadir padding superior */
 main {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px;
+  justify-content: flex-start;
+  padding: 32px 16px 16px;  /* más espacio arriba */
+  gap: 24px;
 }
 
-/* 6. SoundCloud loader */
-.sc-loader {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-  width: 90%;
-  max-width: 960px;
-}
-.sc-loader input {
-  flex: 1;
-  font-family: inherit;
-  font-size: 10px;
-  color: #00ff99;
-  background: #fff;
-  border: 2px outset #00ff99;
-  padding: 4px 8px;
-}
-
-/* 7. Controles matrix */
+/* 6. Controles (centrados, con margen superior extra) */
 .controls {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 16px;  /* separa de la parte superior */
 }
-.controls button {
+.controls button:not(#loadBtn) {
   background: transparent;
   border: none;
-  width: 40px;
-  height: 40px;
+  width: 80px;     /* Botón más grande para iconos */
+  height: 80px;
   padding: 0;
   cursor: pointer;
 }
 .controls button i,
 .controls button svg {
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
   stroke: #fff;
   stroke-width: 3px;
   fill: none;
 }
 
-/* Botón “Load Files” conserva su borde verde */
+/* 7. Botón “Load Files” */
 button#loadBtn {
-  width: auto;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-family: 'Press Start 2P', monospace;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-family: 'Press Start 2P';
   background: #fff;
   border: 2px solid #00ff99;
+  cursor: pointer;
 }
 
-/* 8. Cola de reproducción */
+/* 8. Canvas: grande, centrado, responsivo con ratio 16:9, margen superior */
+#canvas {
+  width: 90vw;
+  max-width: 1400px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 4px solid #00ff99;
+  display: block;
+  margin: 24px auto 0; /* baja el canvas desde el top */
+}
+
+/* 9. Fullscreen al hacer click en canvas */
+#canvas:fullscreen,
+#canvas:-webkit-full-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+/* 10. Botón de micrófono junto a Load Files */
+.audio-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 2.2rem;
+  margin-left: 0.5rem;
+  transition: color 0.2s;
+}
+.audio-btn.active {
+  color: #1db954;
+}
+
+/* 11. Botón fullscreen esquina inferior derecha */
+button#fullscreenBtn {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+button#fullscreenBtn i,
+button#fullscreenBtn svg {
+  width: 28px;
+  height: 28px;
+  stroke: #fff;
+  stroke-width: 3px;
+  fill: none;
+}
+
+/* 12. Cola de reproducción (si la usas) */
 ul#queue {
   list-style: none;
   padding: 0;
@@ -109,44 +149,4 @@ ul#queue li.active {
 }
 ul.hidden {
   display: none;
-}
-
-/* 9. Canvas */
-canvas {
-  flex: 1;
-  width: 90%;
-  max-width: 960px;
-  background: #000;
-  border: 4px solid #00ff99;
-  margin-top: 8px;
-}
-
-/* 10. Fullscreen al hacer click en canvas */
-canvas:fullscreen,
-canvas:-webkit-full-screen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw !important;
-  height: 100vh !important;
-  border: none !important;
-  margin: 0;
-}
-
-/* 11. Botón de pantalla completa en la esquina inferior derecha */
-button#fullscreenBtn {
-  position: fixed;
-  bottom: 10px;
-  right: 10px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-button#fullscreenBtn i,
-button#fullscreenBtn svg {
-  width: 24px;
-  height: 24px;
-  stroke: #fff;
-  stroke-width: 3px;
-  fill: none;
 }

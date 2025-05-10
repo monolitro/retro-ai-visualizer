@@ -11,15 +11,6 @@
     <h1>Visualizer by Manolitro</h1>
   </header>
 
-  <main>
-    <div class="sc-loader">
-      <input
-        id="scUrlInput"
-        type="text"
-        placeholder="SoundCloud track or playlist URL"
-      />
-      <button id="loadScBtn">Load SC</button>
-    </div>
 
     <div class="controls">
       <button id="queueBtn"      title="Show Queue">
@@ -35,11 +26,15 @@
         <i data-lucide="skip-forward"></i>
       </button>
       <button id="loadBtn">Load Files</button>
+      <button id="systemAudioBtn" title="Capturar audio del sistema" class="audio-btn">
+        <i data-lucide="mic"></i>
+      </button>
     </div>
 
     <ul id="queue" class="hidden"></ul>
 
     <canvas id="canvas"></canvas>
+   
     <audio id="audio" autoplay style="display:none"></audio>
   </main>
 

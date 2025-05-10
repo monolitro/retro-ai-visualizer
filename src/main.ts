@@ -21,9 +21,9 @@ const queueEl       = document.getElementById('queue')        as HTMLUListElemen
 const canvas        = document.getElementById('canvas')       as HTMLCanvasElement;
 const fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
 
-// Único <audio> en el DOM
-const audio = document.getElementById('audio') as HTMLAudioElement;
-audio.crossOrigin = 'anonymous';
+// Micrófono de sistema (botón junto a Load Files)
+const systemAudioBtn = document.getElementById('systemAudioBtn') as HTMLButtonElement;
+let systemAudioStream: MediaStream | null = null;
 
 // ——————————————
 // 3) AudioContext + Analyser
@@ -35,15 +35,64 @@ analyser.minDecibels           = -90;
 analyser.maxDecibels           = -10;
 analyser.smoothingTimeConstant = 0.85;
 
-// ——————————————
-// 4) Conectar el <audio> al AudioContext UNA VEZ
-// ——————————————
+// Conectar el <audio> al AudioContext
+const audio = document.getElementById('audio') as HTMLAudioElement;
+audio.crossOrigin = 'anonymous';
 const srcNode = audioCtx.createMediaElementSource(audio);
-srcNode.connect(analyser);
-analyser.connect(audioCtx.destination);
+srcNode.connect(audioCtx.destination);  // el audio de tu <audio> va a los auriculares
+srcNode.connect(analyser); 
 
 // ——————————————
-// 5) Estado global
+// Helper: detectar dispositivo loopback (Stereo Mix, Cable, etc.)
+// ——————————————
+async function getLoopbackStream(): Promise<MediaStream> {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const inputs = devices.filter(d => d.kind === 'audioinput');
+  // Busca etiquetas comunes de loopback
+  const names = /loopback|stereo mix|what you hear|cable output/i;
+  const candidate = inputs.find(d => names.test(d.label));
+  if (candidate) {
+    console.log('Usando dispositivo loopback:', candidate.label);
+    return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: candidate.deviceId } } });
+  }
+  alert('No se encontró dispositivo Loopback. Usando entrada por defecto.');
+  return navigator.mediaDevices.getUserMedia({ audio: true });
+}
+
+// ——————————————
+// Captura de audio del sistema
+// ——————————————
+systemAudioBtn.addEventListener('click', async () => {
+  if (systemAudioStream) {
+    // Detener captura si ya activa
+    systemAudioStream.getTracks().forEach(t => t.stop());
+    systemAudioStream = null;
+    systemAudioBtn.classList.remove('active');
+    return;
+  }
+  try {
+    const stream = await getLoopbackStream();
+    systemAudioStream = stream;
+    systemAudioBtn.classList.add('active');
+
+    const sysSource = audioCtx.createMediaStreamSource(stream);
+    sysSource.connect(analyser);
+
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    // Crear o reiniciar visualizador con audio del sistema
+    vizCtl?.stop();
+    vizCtl = createVisualizer(audioCtx, analyser, canvas);
+    vizCtl.start();
+
+  } catch (err) {
+    console.error('Error capturando audio del sistema:', err);
+    alert('No se pudo acceder al audio del sistema.');
+  }
+});
+
+// ——————————————
+// Estado global y control de visual
 // ——————————————
 let vizCtl: { start: ()=>void; stop: ()=>void; } | null = null;
 let queue: string[] = [];
@@ -51,17 +100,17 @@ let current = 0;
 let playing = false;
 
 // ——————————————
-// 6) Íconos Play/Pause
+// Íconos Play/Pause
 // ——————————————
-const playIcon  = '<i data-lucide="play"></i>';
-const pauseIcon = '<i data-lucide="pause"></i>';
+const playIcon  = '<i data-lucide=\"play\"></i>';
+const pauseIcon = '<i data-lucide=\"pause\"></i>';
 function updatePlayIcon() {
   playPauseBtn.innerHTML = playing ? pauseIcon : playIcon;
   createIcons({ icons });
 }
 
 // ——————————————
-// 7) Pintar cola
+// Render cola
 // ——————————————
 function renderQueue() {
   queueEl.innerHTML = '';
@@ -74,21 +123,13 @@ function renderQueue() {
 }
 
 // ——————————————
-// 8) Cargar y reproducir pista (con auto-avance)
+// Cargar y reproducir pista (auto-avance)
 // ——————————————
 async function loadTrack(idx: number) {
   if (!queue[idx]) return;
-
-  // 1) Detén audio y visual, forzamos reinicio
-  audio.pause();
-  vizCtl?.stop();
-  vizCtl = null;
-
-  // 2) Cambia la fuente
+  audio.pause(); vizCtl?.stop(); vizCtl = null;
   audio.src = queue[idx];
   audio.load();
-
-  // 3) Auto-avance al terminar
   audio.onended = async () => {
     playing = false;
     updatePlayIcon();
@@ -99,19 +140,9 @@ async function loadTrack(idx: number) {
     }
   };
 
-  // 4) Creamos siempre un nuevo visualizador
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
   vizCtl = createVisualizer(audioCtx, analyser, canvas);
-
-  // 5) Asegurar AudioContext activo
-  if (audioCtx.state === 'suspended') {
-    await audioCtx.resume();
-  }
-
-  // 6) Esperar a que esté listo y lanzar play()
-  await new Promise<void>(res => {
-    audio.addEventListener('canplay', () => res(), { once: true });
-  });
-
+  await new Promise<void>(res => audio.addEventListener('canplay', () => res(), { once: true }));
   try {
     await audio.play();
     playing = true;
@@ -124,15 +155,12 @@ async function loadTrack(idx: number) {
 }
 
 // ——————————————
-// 9) Eventos UI
+// Eventos UI
 // ——————————————
-
-// A) Archivos locales
+// Archivos locales
 loadBtn.addEventListener('click', () => {
   const inp = document.createElement('input');
-  inp.type = 'file';
-  inp.accept = 'audio/*';
-  inp.multiple = true;
+  inp.type = 'file'; inp.accept = 'audio/*'; inp.multiple = true;
   inp.onchange = async () => {
     const files = Array.from(inp.files || []);
     queue = files.map(f => URL.createObjectURL(f));
@@ -143,61 +171,38 @@ loadBtn.addEventListener('click', () => {
   inp.click();
 });
 
-// B) SoundCloud vía proxy
+// SoundCloud vía proxy
 loadScBtn.addEventListener('click', async () => {
   const link = scUrlInput.value.trim();
-  if (!link) {
-    alert('Introduce una URL de SoundCloud');
-    return;
-  }
-  if (!link.includes('soundcloud.com')) {
-    alert('La URL debe ser de SoundCloud');
-    return;
-  }
+  if (!link) return alert('Introduce una URL de SoundCloud');
+  if (!link.includes('soundcloud.com')) return alert('La URL debe ser de SoundCloud');
   let clean = link;
   try { clean = `${new URL(link).origin}${new URL(link).pathname}`; } catch {}
-  const proxy = `/api/sc-stream?url=${encodeURIComponent(clean)}`;
-  queue.push(proxy);
+  queue.push(`/api/sc-stream?url=${encodeURIComponent(clean)}`);
   current = queue.length - 1;
   renderQueue();
   await loadTrack(current);
 });
 
-// C) Mostrar/ocultar cola
-queueBtn.addEventListener('click', () => {
-  queueEl.classList.toggle('hidden');
-});
+// Mostrar/ocultar cola
+queueBtn.addEventListener('click', () => queueEl.classList.toggle('hidden'));
 
-// D) Play/Pause
+// Play/Pause
 playPauseBtn.addEventListener('click', () => {
   if (!audio.src) return;
   if (playing) {
-    audio.pause();
-    vizCtl?.stop();
-    playing = false;
+    audio.pause(); vizCtl?.stop(); playing = false;
   } else {
-    audio.play();
-    vizCtl?.start();
-    playing = true;
+    audio.play(); vizCtl?.start(); playing = true;
   }
   updatePlayIcon();
 });
 
-// E) Prev/Next
-prevBtn.addEventListener('click', async () => {
-  if (current > 0) {
-    current--;
-    await loadTrack(current);
-  }
-});
-nextBtn.addEventListener('click', async () => {
-  if (current < queue.length - 1) {
-    current++;
-    await loadTrack(current);
-  }
-});
+// Prev/Next
+prevBtn.addEventListener('click', async () => { if (current > 0) { current--; await loadTrack(current);} });
+nextBtn.addEventListener('click', async () => { if (current < queue.length-1) { current++; await loadTrack(current);} });
 
-// F) Fullscreen para TODO
+// Fullscreen global
 fullscreenBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
@@ -206,7 +211,7 @@ fullscreenBtn.addEventListener('click', () => {
   }
 });
 
-// G) Fullscreen SOLO canvas
+// Fullscreen SOLO canvas
 canvas.addEventListener('click', () => {
   if (document.fullscreenElement === canvas) {
     document.exitFullscreen();
