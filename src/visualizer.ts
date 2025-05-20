@@ -1,29 +1,32 @@
 import Butterchurn from 'butterchurn';
 import ButterchurnPresets from 'butterchurn-presets';
 
-export const PRESETS = ButterchurnPresets.getPresets();
-export const PRESET_NAMES = Object.keys(PRESETS);
+const PRESETS = ButterchurnPresets.getPresets();
+const PRESET_NAMES = Object.keys(PRESETS);
 
 export function createVisualizer(
-  audioCtx: AudioContext,
-  analyser: AnalyserNode,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  analyser: AnalyserNode
 ) {
+  // Ajustar tamaño del canvas explícitamente
+  canvas.width = canvas.clientWidth || 800;
+  canvas.height = canvas.clientHeight || 600;
+
+  const audioCtx = analyser.context as AudioContext;
   const viz = Butterchurn.createVisualizer(audioCtx, canvas, {
-    width:  canvas.clientWidth,
-    height: canvas.clientHeight,
-    pixelRatio: window.devicePixelRatio || 1,
+    width: canvas.width,
+    height: canvas.height,
+    pixelRatio: window.devicePixelRatio || 1
   });
+
   viz.connectAudio(analyser);
 
-  // cargar un preset aleatorio (más psicodélico)
-  const name = PRESET_NAMES[Math.floor(Math.random()*PRESET_NAMES.length)];
-  viz.loadPreset(PRESETS[name], 0.0);
-  console.log('🎛️ Preset cargado:', name);
-
-  window.addEventListener('resize', () =>
-    viz.setRendererSize(canvas.clientWidth, canvas.clientHeight)
-  );
+  function resize() {
+    canvas.width = canvas.clientWidth || 800;
+    canvas.height = canvas.clientHeight || 600;
+    viz.setRendererSize(canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
 
   let raf = 0;
   function loop() {
@@ -31,16 +34,30 @@ export function createVisualizer(
     raf = requestAnimationFrame(loop);
   }
 
+  // --- NUEVO: Método para cargar preset aleatorio sin destruir visualizador ---
+  function loadRandomPreset() {
+    const name = PRESET_NAMES[Math.floor(Math.random() * PRESET_NAMES.length)];
+    viz.loadPreset(PRESETS[name], 0.0);
+    console.log('🎛️ Nuevo preset cargado:', name);
+  }
+
   return {
     start() {
-      if (!raf) loop();
+      if (raf) cancelAnimationFrame(raf);
+      loadRandomPreset();
+      loop();
     },
-    stop() {
-      cancelAnimationFrame(raf);
-      raf = 0;
-      // limpiamos el canvas para que no queden restos
+    loadRandomPreset,
+    destroy() {
+      if (raf) cancelAnimationFrame(raf);
+      viz.disconnectAudio();
+      window.removeEventListener('resize', resize);
       const ctx2 = canvas.getContext('2d');
-      if (ctx2) ctx2.clearRect(0, 0, canvas.width, canvas.height);
+      if (ctx2) {
+        ctx2.clearRect(0, 0, canvas.width, canvas.height);
+        ctx2.fillStyle = "#000";
+        ctx2.fillRect(0, 0, canvas.width, canvas.height);
+      }
     }
   };
 }

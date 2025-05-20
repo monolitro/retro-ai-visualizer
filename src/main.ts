@@ -1,209 +1,186 @@
 import { createIcons, icons } from 'lucide';
-import { createVisualizer }   from './visualizer';
+import { createVisualizer } from './visualizer';
+import { getSystemAudioStream } from './captureAudio';
 import './styles/retro.css';
 
-// ——————————————
-// 1) Inicializar iconos Lucide
-// ——————————————
+// Inicializar iconos Lucide
 createIcons({ icons });
 
-// ——————————————
-// 2) Referencias al DOM
-// ——————————————
-const scUrlInput    = document.getElementById('scUrlInput')   as HTMLInputElement;
-const loadScBtn     = document.getElementById('loadScBtn')    as HTMLButtonElement;
-const loadBtn       = document.getElementById('loadBtn')      as HTMLButtonElement;
-const queueBtn      = document.getElementById('queueBtn')     as HTMLButtonElement;
-const playPauseBtn  = document.getElementById('playPauseBtn') as HTMLButtonElement;
-const prevBtn       = document.getElementById('prevBtn')      as HTMLButtonElement;
-const nextBtn       = document.getElementById('nextBtn')      as HTMLButtonElement;
-const queueEl       = document.getElementById('queue')        as HTMLUListElement;
-const canvas        = document.getElementById('canvas')       as HTMLCanvasElement;
-const fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
+// DOM
+const loadBtn     = document.getElementById('loadBtn')      as HTMLButtonElement;
+const fileInput   = document.getElementById('fileInput')    as HTMLInputElement;
+const queueBtn    = document.getElementById('queueBtn')     as HTMLButtonElement;
+const prevBtn     = document.getElementById('prevBtn')      as HTMLButtonElement;
+const playBtn     = document.getElementById('playBtn')      as HTMLButtonElement;
+const nextBtn     = document.getElementById('nextBtn')      as HTMLButtonElement;
+const micBtn      = document.getElementById('micBtn')       as HTMLButtonElement;
+const pageFSBtn   = document.getElementById('pageFSBtn')    as HTMLButtonElement;
+const canvas      = document.getElementById('visualizer')   as HTMLCanvasElement;
 
-// Micrófono de sistema (botón junto a Load Files)
-const systemAudioBtn = document.getElementById('systemAudioBtn') as HTMLButtonElement;
-let systemAudioStream: MediaStream | null = null;
+// Modal cola
+const queueModal  = document.getElementById('queueModal')   as HTMLDivElement;
+const queueList   = document.getElementById('queueList')    as HTMLUListElement;
+const closeQueueBtn = document.getElementById('closeQueueBtn') as HTMLButtonElement;
 
-// ——————————————
-// 3) AudioContext + Analyser
-// ——————————————
-const audioCtx = new AudioContext();
-const analyser = audioCtx.createAnalyser();
-analyser.fftSize               = 2048;
-analyser.minDecibels           = -90;
-analyser.maxDecibels           = -10;
-analyser.smoothingTimeConstant = 0.85;
+// Audio setup
+const audioEl = new Audio();
+audioEl.crossOrigin = 'anonymous';
+const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+let srcNode: MediaElementAudioSourceNode | null = null;
+let analyser: AnalyserNode | null = null;
+let viz: { loadRandomPreset(): void; start(): void; destroy(): void } | null = null;
 
-// Conectar el <audio> al AudioContext
-const audio = document.getElementById('audio') as HTMLAudioElement;
-audio.crossOrigin = 'anonymous';
-const srcNode = audioCtx.createMediaElementSource(audio);
-srcNode.connect(audioCtx.destination);  // el audio de tu <audio> va a los auriculares
-srcNode.connect(analyser); 
+// === GESTIÓN DE COLA DE ARCHIVOS ===
+let audioQueue: File[] = [];
+let currentTrackIdx = 0;
 
-// ——————————————
-// Helper: detectar dispositivo loopback (Stereo Mix, Cable, etc.)
-// ——————————————
-async function getLoopbackStream(): Promise<MediaStream> {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const inputs = devices.filter(d => d.kind === 'audioinput');
-  // Busca etiquetas comunes de loopback
-  const names = /loopback|stereo mix|what you hear|cable output/i;
-  const candidate = inputs.find(d => names.test(d.label));
-  if (candidate) {
-    console.log('Usando dispositivo loopback:', candidate.label);
-    return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: candidate.deviceId } } });
-  }
-  alert('No se encontró dispositivo Loopback. Usando entrada por defecto.');
-  return navigator.mediaDevices.getUserMedia({ audio: true });
+// === UTILIDAD PARA CAMBIO DE ICONO PLAY/PAUSE ===
+function setPlayPauseIcon(isPlaying: boolean) {
+  // Lucide icon names: "play", "pause"
+  playBtn.innerHTML = `<i data-lucide="${isPlaying ? "pause" : "play"}"></i>`;
+  createIcons({ icons, attrs: { class: "lucide" } }); // re-render icon
 }
 
-// ——————————————
-// Captura de audio del sistema
-// ——————————————
-systemAudioBtn.addEventListener('click', async () => {
-  if (systemAudioStream) {
-    // Detener captura si ya activa
-    systemAudioStream.getTracks().forEach(t => t.stop());
-    systemAudioStream = null;
-    systemAudioBtn.classList.remove('active');
-    return;
+// Inicializa el pipeline de audio y visual solo UNA VEZ
+function initAudioAndVisualizer() {
+  if (!analyser) {
+    analyser = audioCtx.createAnalyser();
+    srcNode = audioCtx.createMediaElementSource(audioEl);
+    srcNode.connect(audioCtx.destination);
+    srcNode.connect(analyser);
+    viz = createVisualizer(canvas, analyser);
+    viz.start();
   }
+}
+
+// --- Carga de archivos ---
+loadBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', async () => {
+  if (!fileInput.files?.length) return;
+  audioQueue = Array.from(fileInput.files);
+  currentTrackIdx = 0;
+  await playCurrentTrack();
+  updateQueueModal();
+});
+
+async function playCurrentTrack(loadNewPreset = true) {
+  if (!audioQueue.length) return;
+  const file = audioQueue[currentTrackIdx];
+  audioEl.src = URL.createObjectURL(file);
+
+  // Solo inicializa el pipeline la PRIMERA VEZ
+  if (!viz) {
+    await audioCtx.resume();
+    initAudioAndVisualizer();
+  }
+  await audioEl.play();
+
+  // Carga preset nuevo si corresponde
+  if (viz && loadNewPreset) {
+    viz.loadRandomPreset();
+  }
+  updateQueueModal();
+}
+
+// --- Captura de micro/audio sistema ---
+micBtn.addEventListener('click', async () => {
   try {
-    const stream = await getLoopbackStream();
-    systemAudioStream = stream;
-    systemAudioBtn.classList.add('active');
-
-    const sysSource = audioCtx.createMediaStreamSource(stream);
-    sysSource.connect(analyser);
-
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-    // Crear o reiniciar visualizador con audio del sistema
-    vizCtl?.stop();
-    vizCtl = createVisualizer(audioCtx, analyser, canvas);
-    vizCtl.start();
-
-  } catch (err) {
-    console.error('Error capturando audio del sistema:', err);
+    if (viz) { viz.destroy(); viz = null; }
+    if (srcNode) { try { srcNode.disconnect(); } catch {} srcNode = null; }
+    if (analyser) { try { analyser.disconnect(); } catch {} analyser = null; }
+    const stream = await getSystemAudioStream();
+    analyser = audioCtx.createAnalyser();
+    const src = audioCtx.createMediaStreamSource(stream);
+    src.connect(analyser);
+    viz = createVisualizer(canvas, analyser);
+    viz.start();
+    micBtn.classList.add('active');
+    audioQueue = [];
+    currentTrackIdx = 0;
+    updateQueueModal();
+  } catch {
     alert('No se pudo acceder al audio del sistema.');
   }
 });
 
-// ——————————————
-// Estado global y control de visual
-// ——————————————
-let vizCtl: { start: ()=>void; stop: ()=>void; } | null = null;
-let queue: string[] = [];
-let current = 0;
-let playing = false;
+// --- Estados de play/mic + icono dinámico ---
+audioEl.addEventListener('play',  () => {
+  playBtn.classList.add('active');
+  setPlayPauseIcon(true);
+});
+audioEl.addEventListener('pause', () => {
+  playBtn.classList.remove('active');
+  micBtn.classList.remove('active');
+  setPlayPauseIcon(false);
+});
 
-// ——————————————
-// Íconos Play/Pause
-// ——————————————
-const playIcon  = '<i data-lucide=\"play\"></i>';
-const pauseIcon = '<i data-lucide=\"pause\"></i>';
-function updatePlayIcon() {
-  playPauseBtn.innerHTML = playing ? pauseIcon : playIcon;
-  createIcons({ icons });
-}
+// --- Arranque inicial icono ---
+setPlayPauseIcon(false);
 
-// ——————————————
-// Render cola
-// ——————————————
-function renderQueue() {
-  queueEl.innerHTML = '';
-  queue.forEach((_, i) => {
+// --- Controles Prev / Play / Next ---
+playBtn.addEventListener('click', () => audioEl.paused ? audioEl.play() : audioEl.pause());
+
+prevBtn.addEventListener('click', async () => {
+  if (audioQueue.length > 0) {
+    if (currentTrackIdx > 0) currentTrackIdx--;
+    else currentTrackIdx = 0;
+    await playCurrentTrack(true); // Nuevo preset
+  }
+});
+
+nextBtn.addEventListener('click', async () => {
+  if (audioQueue.length > 0) {
+    if (currentTrackIdx < audioQueue.length - 1) currentTrackIdx++;
+    else currentTrackIdx = 0;
+    await playCurrentTrack(true); // Nuevo preset
+  }
+});
+
+// --- Paso automático al terminar una canción ---
+audioEl.addEventListener('ended', async () => {
+  if (audioQueue.length > 0) {
+    if (currentTrackIdx < audioQueue.length - 1) currentTrackIdx++;
+    else currentTrackIdx = 0;
+    await playCurrentTrack(true); // Nuevo preset
+  }
+});
+
+// --- Modal Cola ---
+queueBtn.addEventListener('click', () => {
+  if (audioQueue.length === 0) {
+    alert('No hay canciones en la cola.');
+    return;
+  }
+  updateQueueModal();
+  queueModal.hidden = false;
+});
+
+closeQueueBtn.addEventListener('click', () => {
+  queueModal.hidden = true;
+});
+
+function updateQueueModal() {
+  if (!queueList) return;
+  queueList.innerHTML = '';
+  audioQueue.forEach((file, idx) => {
     const li = document.createElement('li');
-    li.textContent = `Track ${i+1}`;
-    if (i === current) li.classList.add('active');
-    queueEl.appendChild(li);
+    li.textContent = file.name;
+    if (idx === currentTrackIdx) li.className = 'current';
+    queueList.appendChild(li);
   });
 }
 
-// ——————————————
-// Cargar y reproducir pista (auto-avance)
-// ——————————————
-async function loadTrack(idx: number) {
-  if (!queue[idx]) return;
-  audio.pause(); vizCtl?.stop(); vizCtl = null;
-  audio.src = queue[idx];
-  audio.load();
-  audio.onended = async () => {
-    playing = false;
-    updatePlayIcon();
-    if (current < queue.length - 1) {
-      await new Promise(r => setTimeout(r, 1000));
-      current++;
-      await loadTrack(current);
-    }
-  };
-
-  if (audioCtx.state === 'suspended') await audioCtx.resume();
-  vizCtl = createVisualizer(audioCtx, analyser, canvas);
-  await new Promise<void>(res => audio.addEventListener('canplay', () => res(), { once: true }));
-  try {
-    await audio.play();
-    playing = true;
-    vizCtl.start();
-    updatePlayIcon();
-    renderQueue();
-  } catch (err) {
-    console.error('audio.play() rechazado:', err);
+// --- Pantalla completa CANVAS ---
+canvas.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    canvas.requestFullscreen();
+  } else if (document.fullscreenElement === canvas) {
+    document.exitFullscreen();
   }
-}
-
-// ——————————————
-// Eventos UI
-// ——————————————
-// Archivos locales
-loadBtn.addEventListener('click', () => {
-  const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'audio/*'; inp.multiple = true;
-  inp.onchange = async () => {
-    const files = Array.from(inp.files || []);
-    queue = files.map(f => URL.createObjectURL(f));
-    current = 0;
-    renderQueue();
-    await loadTrack(current);
-  };
-  inp.click();
 });
 
-// SoundCloud vía proxy
-loadScBtn.addEventListener('click', async () => {
-  const link = scUrlInput.value.trim();
-  if (!link) return alert('Introduce una URL de SoundCloud');
-  if (!link.includes('soundcloud.com')) return alert('La URL debe ser de SoundCloud');
-  let clean = link;
-  try { clean = `${new URL(link).origin}${new URL(link).pathname}`; } catch {}
-  queue.push(`/api/sc-stream?url=${encodeURIComponent(clean)}`);
-  current = queue.length - 1;
-  renderQueue();
-  await loadTrack(current);
-});
-
-// Mostrar/ocultar cola
-queueBtn.addEventListener('click', () => queueEl.classList.toggle('hidden'));
-
-// Play/Pause
-playPauseBtn.addEventListener('click', () => {
-  if (!audio.src) return;
-  if (playing) {
-    audio.pause(); vizCtl?.stop(); playing = false;
-  } else {
-    audio.play(); vizCtl?.start(); playing = true;
-  }
-  updatePlayIcon();
-});
-
-// Prev/Next
-prevBtn.addEventListener('click', async () => { if (current > 0) { current--; await loadTrack(current);} });
-nextBtn.addEventListener('click', async () => { if (current < queue.length-1) { current++; await loadTrack(current);} });
-
-// Fullscreen global
-fullscreenBtn.addEventListener('click', () => {
+// --- Pantalla completa PÁGINA WEB ---
+pageFSBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
   } else {
@@ -211,11 +188,52 @@ fullscreenBtn.addEventListener('click', () => {
   }
 });
 
-// Fullscreen SOLO canvas
-canvas.addEventListener('click', () => {
+// --- Fullscreen & Resize helpers ---
+const origCanvasStyle = {
+  width: canvas.style.width,
+  height: canvas.style.height,
+  position: canvas.style.position,
+  top: canvas.style.top,
+  left: canvas.style.left,
+  border: canvas.style.border,
+  zIndex: canvas.style.zIndex
+};
+
+function resizeCanvasToFullscreen() {
+  canvas.style.position = 'fixed';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.width = '100vw';
+  canvas.style.height = '100vh';
+  canvas.style.border = 'none';
+  canvas.style.zIndex = '9999';
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+function restoreCanvasSize() {
+  canvas.style.width    = origCanvasStyle.width;
+  canvas.style.height   = origCanvasStyle.height;
+  canvas.style.position = origCanvasStyle.position;
+  canvas.style.top      = origCanvasStyle.top;
+  canvas.style.left     = origCanvasStyle.left;
+  canvas.style.border   = origCanvasStyle.border;
+  canvas.style.zIndex   = origCanvasStyle.zIndex;
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+}
+
+document.addEventListener('fullscreenchange', () => {
   if (document.fullscreenElement === canvas) {
-    document.exitFullscreen();
+    resizeCanvasToFullscreen();
   } else {
-    canvas.requestFullscreen();
+    restoreCanvasSize();
+  }
+});
+
+window.addEventListener('resize', () => {
+  if (document.fullscreenElement === canvas) {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
   }
 });

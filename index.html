@@ -1,48 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Visualizer by Manolitro</title>
-  <link rel="stylesheet" href="/src/styles/retro.css" />
+  <link rel="stylesheet" href="/styles/retro.css" />
 </head>
 <body>
+  <!-- Cabecera -->
   <header>
     <h1>Visualizer by Manolitro</h1>
   </header>
 
-
-    <div class="controls">
-      <button id="queueBtn"      title="Show Queue">
-        <i data-lucide="list-music"></i>
-      </button>
-      <button id="prevBtn"       title="Previous">
-        <i data-lucide="skip-back"></i>
-      </button>
-      <button id="playPauseBtn"  title="Play/Pause">
-        <i data-lucide="play"></i>
-      </button>
-      <button id="nextBtn"       title="Next">
-        <i data-lucide="skip-forward"></i>
-      </button>
-      <button id="loadBtn">Load Files</button>
-      <button id="systemAudioBtn" title="Capturar audio del sistema" class="audio-btn">
-        <i data-lucide="mic"></i>
-      </button>
+  <!-- Contenido principal -->
+  <main>
+    <!-- Cola de canciones (modal oculta) -->
+    <div id="queueModal" class="queue-modal" hidden>
+      <div class="queue-modal-content">
+        <h2>Cola de canciones</h2>
+        <ul id="queueList"></ul>
+        <button id="closeQueueBtn">Cerrar</button>
+      </div>
+    </div>
+    <!-- Controles -->
+    <div id="controls" class="controls">
+      <button id="queueBtn" type="button" aria-label="Cola"><i data-feather="list"></i></button>
+      <button id="prevBtn"  type="button" aria-label="Anterior"><i data-feather="chevrons-left"></i></button>
+      <button id="playBtn"  type="button" aria-label="Play/Pausa"><i data-feather="play"></i></button>
+      <button id="nextBtn"  type="button" aria-label="Siguiente"><i data-feather="chevrons-right"></i></button>
+      <button id="loadBtn"  type="button">Load Files</button>
+      <input  id="fileInput" type="file" accept="audio/*" hidden multiple />
+      <button id="micBtn"   type="button" aria-label="Capturar audio"><i data-feather="mic"></i></button>
     </div>
 
-    <ul id="queue" class="hidden"></ul>
-
-    <canvas id="canvas"></canvas>
-   
-    <audio id="audio" autoplay style="display:none"></audio>
+    <!-- Visualizador -->
+    <div class="visual-container">
+      <!-- PONEMOS TAMAÑO EXPLÍCITO AL CANVAS -->
+      <canvas id="visualizer" width="960" height="540"></canvas>
+    </div>
   </main>
 
-  <!-- este botón estaba faltando -->
-  <button id="fullscreenBtn" title="Toggle Fullscreen" class="fullscreen-btn">
-    <i data-lucide="maximize-2"></i>
+  <!-- Botón pantalla completa página -->
+  <button id="pageFSBtn" type="button" aria-label="Pantalla completa de la web">
+    <i data-feather="maximize"></i>
   </button>
 
+  <!-- Scripts -->
+  <script src="https://unpkg.com/feather-icons"></script>
+  <script>
+    feather.replace();
+  </script>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
